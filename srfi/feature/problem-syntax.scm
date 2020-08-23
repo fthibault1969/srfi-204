@@ -1,7 +1,7 @@
 ;;; problem-syntax.scm handle the rest of the problematic syntax
 ;;; portably in r6rs and r7rs: specifically:
 ;;; ..1 ..= ..* @
-
+#|
 (cond-expand
   (r7rs
     (define-syntax dot-dot-one?
@@ -62,7 +62,7 @@
 			       (free-identifier=? #'x #'@))
 			  #'kt
 			  #'kf)))))))
-
+|#
 ;;;and those macros would be used by these macros
 
 (define-syntax match-underscore
@@ -118,3 +118,113 @@
 		  (match-two v p g+s sk fk i)))
     ((match-at-sign . x)
      (match-two . x))))
+
+;;; ok, after a good night's sleep it occurs to me how to integrate these.
+;;; using Adam's technique (I had a feeling...)
+(cond-expand
+  (r7rs)
+  (r6rs
+    (define (underscore? x )
+      (and (identifier? x) (free-identifier=? x #'_)))
+
+    (define (dot-dot-one? x )
+      (and (identifier? x) (free-identifier=? x #'..1)))
+
+    (define (dot-dot-equal? x )
+      (and (identifier? x) (free-identifier=? x #'..=)))
+
+    (define (dot-dot-star? x )
+      (and (identifier? x) (free-identifier=? x #'..*)))
+
+    (define (at-sign? x )
+      (and (identifier? x) (free-identifier=? x #'@)))))
+
+(cond-expand
+  (r7rs
+    (define-syntax match-prob
+      (syntax-rules (_ ..1 ..* ..= @)
+	((match-prob v _ g+s (sk ...) fk i)
+	 (sk ... i))
+	((match-prob v (p ..1) g+s sk fk i)
+	 (if (pair? v)
+	     (match-one v (p ___) g+s sk fk i)
+	     fk))
+	((match-prob v (p ..= n . r) g+s sk fk i)
+	 (match-extract-underscore
+	   p
+	   (match-gen-ellipsis/range n n v p r g+s sk fk i) i ()))
+	((match-prob v (p ..* n m . r) g+s sk fk i)
+	 (match-extract-underscore
+	   p
+	   (match-gen-ellipsis/range n m v p r g+s sk fk i) i ()))
+	((match-prob v (@ rec p ...) g+s sk fk i)
+	 (if (is-a? v rec)
+	     (match-record-named-refs v rec (p ...) g+s sk fk i)
+	     fk))
+	((match-prob . x)
+	 (match-two . x)))))
+  (r6rs
+    (define-syntax match-prob
+      (lambda (stx)
+	(syntax-case stx ()
+	  ((match-prob v p g+s (sk ...) fk i)
+	   (underscore? #'p)
+	   #'(sk ... i))
+	  ((match-prob v (p q) g+s sk fk i)
+	   (dot-dot-one? #'q)
+	   #'(if (pair? v)
+	         (match-one v (p ___) g+s sk fk i)
+	         fk))
+	  ((match-prob v (p q n . r) g+s sk fk i)
+	   (dot-dot-equal? #'q)
+	   #'(match-extract-underscore
+	       p
+	       (match-gen-ellipsis/range n n v p r g+s sk fk i) i ()))
+	  ((match-prob v (p q n m . r) g+s sk fk i)
+	   (dot-dot-star? #'q)
+	   #'(match-extract-underscore
+	       p
+	       (match-gen-ellipsis/range n m v p r g+s sk fk i) i ()))
+	 ((match-prob v (q rec p ...) g+s sk fk i) 
+	  (at-sign? #'q)
+	  #'(if (is-a? v rec)
+	        (match-record-named-refs v rec (p ...) g+s sk fk i)
+	        fk))
+	  ((match-prob . x)
+	   #'(match-two . x)))))))
+
+;;; now to do the same with match-extract-vars / -underscore
+
+(cond-expand
+  (r7rs
+    (define-syntax match-extract-prob
+      (syntax-rules (_ ..1 ..= ..* @)
+	((match-extract-prob (@ rec (f p) ...) . x)
+	 (match-extract-prob (p ...) . x))
+	((match-extract-prob _ (k ...) i v) (k ... v))
+	((match-extract-prob ..1 (k ...) i v)  (k ... v))
+	((match-extract-prob ..= (k ...) i v)  (k ... v))
+	((match-extract-prob ..* (k ...) i v)  (k ... v))
+	((match-extract-prob . x)
+	 (match-extract-vars . x)))))
+  (r6rs
+    (define-syntax match-extract-prob
+      (lambda (stx)
+	(syntax-case stx ()
+	((match-extract-prob (q rec (f p) ...) . x)
+	 (at-sign? #'q)
+	 #'(match-extract-prob (p ...) . x))
+	((match-extract-prob q (k ...) i v)
+	 (underscore? #'q)
+	 #'(k ... v)) 
+	((match-extract-prob q (k ...) i v)  
+	 (dot-dot-one? q)
+	 #'(k ... v))
+	((match-extract-prob q (k ...) i v)  
+	 (dot-dot-equal? #'q)
+	 #'(k ... v))
+	((match-extract-prob q (k ...) i v)  
+	 (dot-dot-star? #'q)
+	 #'(k ... v))
+	((match-extract-prob . x)
+	 #'(match-extract-vars . x))))))
