@@ -7,14 +7,14 @@
 	  match-letrec
 	  match-let*
 	  ___
-	#|  ..1
+	#|..1
 	  ..=
 	  ..* |#
 	  ***
 	  ?
 	  $
 	  struct
-	;  @
+	 ;@
 	  object
 	  get!)
   (import (srfi :0)
@@ -50,4 +50,4 @@
 	       ((> i len) (error "name not in record" n))
 	       ((eq? n (vector-ref names i)) i)
 	       (else (lp (+ i 1 )))))))))
-    (include "../feature/srfi-204-r6rs-2.scm")))
+    (include "../feature/srfi-204-r6rs-4.scm")))
