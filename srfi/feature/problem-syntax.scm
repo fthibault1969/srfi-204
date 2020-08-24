@@ -1,7 +1,6 @@
 ;;; problem-syntax.scm handle the rest of the problematic syntax
 ;;; portably in r6rs and r7rs: specifically:
 ;;; ..1 ..= ..* @
-#|
 (cond-expand
   (r7rs
     (define-syntax dot-dot-one?
@@ -16,7 +15,7 @@
 		      (if (and (identifier? #'x)
 			       (free-identifier=? #'x #'..1))
 			  #'kt
-			  #'kf)))))))i
+			  #'kf)))))))
 (cond-expand
   (r7rs
     (define-syntax dot-dot-equal?
@@ -62,7 +61,6 @@
 			       (free-identifier=? #'x #'@))
 			  #'kt
 			  #'kf)))))))
-|#
 ;;;and those macros would be used by these macros
 
 (define-syntax match-underscore
@@ -115,7 +113,7 @@
 		  (if (is-a? v rec)
 		      (match-record-named-refs v rec (p ...) g+s sk fk i)
 		      fk)
-		  (match-two v p g+s sk fk i)))
+		  (match-two v (q rec p ...) g+s sk fk i)))
     ((match-at-sign . x)
      (match-two . x))))
 
@@ -227,4 +225,44 @@
 	 (dot-dot-star? #'q)
 	 #'(k ... v))
 	((match-extract-prob . x)
-	 #'(match-extract-vars . x))))))
+	 #'(match-extract-vars . x)))))))
+
+;;; well my second idea didn't work so it's back to the first
+(define-syntax match-extract-prob 
+  (syntax-rules ()
+	((match-extract-prob (q rec (f p) ...) . x)
+	 (at-sign? q
+		   (match-extract-prob (p ...) . x)
+		   (match-extract-vars (q rec (f p) ...) . x)))
+	 ((match-extract-prob . x)
+	  (match-extract-under . x))))
+
+(define-syntax match-extract-under 
+  (syntax-rules ()
+	((match-extract-under p (k ...) i v)
+	 (underscore? p
+		   (k ... v)
+		   (match-extract-d-d-1 p (k ...) i v)))
+	 ((match-extract-under . x)
+	  (match-extract-vars . x))))
+
+(define-syntax match-extract-d-d-1 
+  (syntax-rules ()
+	((match-extract-d-d-1 p (k ...) i v)
+	 (dot-dot-one? p
+		   (k ... v)
+		   (match-extract-d-d-= p (k ...) i v)))))
+
+(define-syntax match-extract-d-d-= 
+  (syntax-rules ()
+	((match-extract-d-d-= p (k ...) i v)
+	 (dot-dot-equal? p
+		   (k ... v)
+		   (match-extract-d-d-* p (k ...) i v)))))
+
+(define-syntax match-extract-d-d-* 
+  (syntax-rules ()
+	((match-extract-d-d-* p (k ...) i v)
+	 (dot-dot-equal? p
+		   (k ... v)
+		   (match-extract-vars p (k ...) i v)))))
